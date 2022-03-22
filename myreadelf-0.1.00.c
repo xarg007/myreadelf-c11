@@ -1,2 +1,7 @@
-sdf;jasdfl;jasd;lf
+#include <stdio.h>
+
+int main()
+{
+	return 0;
+}
 
