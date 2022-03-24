@@ -5,7 +5,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-//=========================================================
 #ifdef XLOG_PTHREAD_T
 #include <pthread.h>
 pthread_mutex_t     xlog_mutex_v = {0};
@@ -85,9 +84,13 @@ int xlog_info_x(const char* fmt, ...)
 
 int xlog_hexdump(uint8_t* p_data, uint32_t i_len)
 {
-    if (p_data == NULL || i_len == 0) { return 0; }
     int iret = 0;
     xlog_mutex_lock();
+    if (p_data == NULL || i_len == 0)
+    {
+        xlog_mutex_unlock();
+        return 0;
+    }
     
     xlog_info_x("\n");
     xlog_info_x("%016p", p_data);
@@ -107,7 +110,7 @@ int xlog_hexdump(uint8_t* p_data, uint32_t i_len)
         {
             if ((i * 16 + j) < i_len)
             {
-                xlog_info_x("%02x ", p_data[i * 16 + j]);
+                xlog_info_x("%02x ", *(p_data + i*16 + j));
             }
             else
             {
@@ -123,8 +126,8 @@ int xlog_hexdump(uint8_t* p_data, uint32_t i_len)
         {
             if ((i * 16 + j) < i_len)
             {
-                if (j < 15) xlog_info_x("%02x ", p_data[i * 16 + j]);
-                else        xlog_info_x("%02x" , p_data[i * 16 + j]);
+                if (j < 15) xlog_info_x("%02x ", *(p_data + i*16 + j));
+                else        xlog_info_x("%02x" , *(p_data + i*16 + j));
             }
             else
             {
@@ -143,7 +146,7 @@ int xlog_hexdump(uint8_t* p_data, uint32_t i_len)
         {
             if ((i * 16 + j) < i_len)
             {
-                unsigned char test_char = p_data[i * 16 + j];
+                unsigned char test_char = *(p_data + i*16 + j);
                 do
                 {
                     if(isalpha(test_char)) break;
@@ -202,7 +205,7 @@ int xlog_info(const char* fmt, ...)
 
 uint8_t* get_elf64_data(const char* filename, uint32_t* len)
 {
-    xlog_info("  >> get_elf64_data(%s, len) entry;\n", filename);
+    xlog_info("  >> get_elf64_data(\"%s\", len) entry;\n", filename);
     *len = 0x12;
     
     uint8_t* p_data         = NULL;
@@ -217,7 +220,7 @@ uint8_t* get_elf64_data(const char* filename, uint32_t* len)
             return NULL;
         
         *len = iLen;
-        p_data = (unsigned char*)calloc(iLen, sizeof(uint8_t));
+        p_data = (unsigned char*)calloc(iLen/4+2, sizeof(uint8_t)*4);
         
         size_t size_readok = fread(p_data, 1, iLen, hFile);
         fclose(hFile);
@@ -235,6 +238,7 @@ uint8_t* get_elf64_data(const char* filename, uint32_t* len)
     return NULL;
 }
 
+//===============================================================
 /* 64-bit ELF base types. */
 typedef unsigned long long  int Elf64_Addr  ;
 typedef unsigned      short int Elf64_Half  ;
@@ -307,17 +311,21 @@ struct S_ELF64_ELFHeader_t* parse_elf64_elf_header(uint8_t* pElfData)
     return NULL;
 }
 
+//===============================================================
+
 struct s_elf64_obj_t
 {
     uint8_t*                    pElfData   ;
     struct S_ELF64_ELFHeader_t* pElfHeader ;
 };
 
-struct s_elf64_obj_t* 
-    build_elf64_obj(uint8_t* p_elf64_data, uint32_t len)
+struct s_elf64_obj_t* build_elf64_obj(uint8_t* p_elf64_data, uint32_t len)
 {
     xlog_info("  >> build_elf64_obj(%p, %d) entry;\n", p_elf64_data, len);
-    struct s_elf64_obj_t* p_elf64_obj = (struct s_elf64_obj_t*)calloc(sizeof(struct s_elf64_obj_t), 1);
+    
+    unsigned int elf64_obj_size = sizeof(struct s_elf64_obj_t);
+    
+    struct s_elf64_obj_t* p_elf64_obj = (struct s_elf64_obj_t*)calloc(elf64_obj_size/4+6, 4);
     
     p_elf64_obj->pElfData   = p_elf64_data;
     p_elf64_obj->pElfHeader = parse_elf64_elf_header(p_elf64_data);
@@ -329,22 +337,110 @@ struct s_elf64_obj_t*
 }
 
 #if 0
-$1 = {int (int, char **)} 0x555555555d78 <main>
-$2 = {int (int (*)(int, char **, char **), 
-           int,
-           char **,
-           int (*)(int, char **, char **),
-           void (*)(void), void (*)(void),
-           void *)
+$1 = {int (
+            int, 
+            char **
+          )
+     } 0x555555555d78 <main>
+$2 = {int (
+            int (*)(int, char **, char **), 
+            int,
+            char **,
+            int (*)(int, char **, char **),
+            void (*)(void), void (*)(void),
+            void *
+          )
      } 0x7ffff7ddbfc0 <__libc_start_main>
 #endif
+
+
+#define x_lnx 1
+#if x_lnx
+void __attribute__((constructor)) before_main_func(void)
+{
+	xlog_info("\e[1;32m################################################{"
+		"}##################################################\e[0m\n");
+	xlog_info("  \e[1;31m#====>>>>\e[0m\n");
+	xlog_info("  >> func{%s:(%05d)@(%s)} is call .\n", __func__, __LINE__, __FILE__);
+	return;
+}
+
+void __attribute__((destructor))  after_main_func(void)
+{
+	xlog_info("  >> func{%s:(%05d)@(%s)} is call .\n", __func__, __LINE__, __FILE__);
+	xlog_info("  \e[1;31m#<<<<====\e[0m\n");
+	return;
+}
+
+void my_init01(void) __attribute__((constructor));
+void my_fini01(void) __attribute__((destructor ));
+void my_init02(void) __attribute__((constructor));
+void my_fini02(void) __attribute__((destructor ));
+void my_init03(void) __attribute__((constructor));
+void my_fini03(void) __attribute__((destructor ));
+
+void my_init01(void)
+{
+	xlog_info("  \e[1;31m#====>>>>\e[0m\n");
+	xlog_info("  >> func{%s:(%05d)@(%s)} is call .\n", __func__, __LINE__, __FILE__);
+	return;
+}
+void my_fini01(void)
+{
+	xlog_info("  >> func{%s:(%05d)@(%s)} is call .\n", __func__, __LINE__, __FILE__);
+	xlog_info("  \e[1;31m#<<<<====\e[0m\n");
+	return;
+}
+void my_init02(void)
+{
+	xlog_info("  \e[1;31m#====>>>>\e[0m\n");
+	xlog_info("  >> func{%s:(%05d)@(%s)} is call .\n", __func__, __LINE__, __FILE__);
+	return;
+}
+void my_fini02(void)
+{
+	xlog_info("  >> func{%s:(%05d)@(%s)} is call .\n", __func__, __LINE__, __FILE__);
+	xlog_info("  \e[1;31m#<<<<====\e[0m\n");
+	return;
+}
+void my_init03(void)
+{
+	xlog_info("  \e[1;31m#====>>>>\e[0m\n");
+	xlog_info("  >> func{%s:(%05d)@(%s)} is call .\n", __func__, __LINE__, __FILE__);
+	return;
+}
+void my_fini03(void)
+{
+	xlog_info("  >> func{%s:(%05d)@(%s)} is call .\n", __func__, __LINE__, __FILE__);
+	xlog_info("  \e[1;31m#<<<<====\e[0m\n");
+	return;
+}
+#endif
+
+int parse_args(int argc, char* argv[])
+{
+	xlog_info("  >> func:%s(%d, %p) is called. (@file:%s,line:%04d).\n",
+			__func__, argc, argv, __FILE__, __LINE__);
+	xlog_info("\n");
+	for(int i=0; i<argc; i++)
+	{
+		xlog_info("    >>> argv[%02d](addr=%p) = {\"%s\"}.\n", i, argv[i], argv[i]);
+	}
+	xlog_info("\n");
+	xlog_info("  >> func:%s() is called. @line:(%04d).\n", __func__, __LINE__);
+	
+	return 0;
+}
 
 // gcc -std=c11 -g -Wall -O0 -DXLOG_PTHREAD_T=1 myreadelf-0.1.00.c -o myapp -pthread
 int main(int argc, char* argv[])
 {
     xlog_init();
     xlog_info("  >> the app starting ... ...\n");
-    xlog_hexdump((uint8_t*)argv, 16*10+11);
+    xlog_hexdump((uint8_t*)argv   , 16*5+11);
+    xlog_hexdump((uint8_t*)argv[0], 16*5+11);
+    parse_args(argc, argv);
+    
     do
     {
         char* filename        = argv[0];
@@ -376,32 +472,52 @@ int main(int argc, char* argv[])
 }
 
 #if 0
-xadmin@hw:~/xwks.git.1/myreadelf-c11$ gcc -std=c11 -g -Wall -O0 -DXLOG_PTHREAD_T=1 myreadelf-0.1.01.c -o myapp -pthread
+xadmin@hw:~/xwks.git.1/myreadelf-c11$ gcc -std=c11 -g -Wall -O0  myreadelf-0.1.02.c -o myapp
 xadmin@hw:~/xwks.git.1/myreadelf-c11$ ./myapp
+################################################{}##################################################
+  #====>>>>
+  >> func{before_main_func:(00364)@(myreadelf-0.1.02.c)} is call .
+  #====>>>>
+  >> func{my_init01:(00385)@(myreadelf-0.1.02.c)} is call .
+  #====>>>>
+  >> func{my_init02:(00397)@(myreadelf-0.1.02.c)} is call .
+  #====>>>>
+  >> func{my_init03:(00409)@(myreadelf-0.1.02.c)} is call .
   >> the app starting ... ...
 
-0x007ffd31233358|00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F|0123456789ABCDEF|
+0x007fffd6433e58|00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F|0123456789ABCDEF|
       =============================================================================
-      0x00000000|60 46 23 31 fd 7f 00 00  00 00 00 00 00 00 00 00|`F#1............|
-      0x00000010|68 46 23 31 fd 7f 00 00  78 46 23 31 fd 7f 00 00|hF#1....xF#1....|
-      0x00000020|90 46 23 31 fd 7f 00 00  a7 46 23 31 fd 7f 00 00|.F#1.....F#1....|
-      0x00000030|bb 46 23 31 fd 7f 00 00  d3 46 23 31 fd 7f 00 00|.F#1.....F#1....|
-      0x00000040|fd 46 23 31 fd 7f 00 00  0c 47 23 31 fd 7f 00 00|.F#1.....G#1....|
-      0x00000050|21 47 23 31 fd 7f 00 00  30 47 23 31 fd 7f 00 00|!G#1....0G#1....|
-      0x00000060|42 47 23 31 fd 7f 00 00  57 47 23 31 fd 7f 00 00|BG#1....WG#1....|
-      0x00000070|68 47 23 31 fd 7f 00 00  4a 4d 23 31 fd 7f 00 00|hG#1....JM#1....|
-      0x00000080|7f 4d 23 31 fd 7f 00 00  a1 4d 23 31 fd 7f 00 00|.M#1.....M#1....|
-      0x00000090|b8 4d 23 31 fd 7f 00 00  d6 4d 23 31 fd 7f 00 00|.M#1.....M#1....|
-      0x000000a0|e1 4d 23 31 fd 7f 00 00  01 4e 23 ** ** ** ** **|.M#1.....N#*****|
+      0x00000000|60 46 43 d6 ff 7f 00 00  00 00 00 00 00 00 00 00|`FC.............|
+      0x00000010|68 46 43 d6 ff 7f 00 00  78 46 43 d6 ff 7f 00 00|hFC.....xFC.....|
+      0x00000020|90 46 43 d6 ff 7f 00 00  a7 46 43 d6 ff 7f 00 00|.FC......FC.....|
+      0x00000030|bb 46 43 d6 ff 7f 00 00  d3 46 43 d6 ff 7f 00 00|.FC......FC.....|
+      0x00000040|fd 46 43 d6 ff 7f 00 00  0c 47 43 d6 ff 7f 00 00|.FC......GC.....|
+      0x00000050|21 47 43 d6 ff 7f 00 00  30 47 43 ** ** ** ** **|!GC.....0GC*****|
       =============================================================================
 
-  >> get_elf64_data(./myapp, len) entry;
 
-0x00557b62b89890|00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F|0123456789ABCDEF|
+0x007fffd6434660|00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F|0123456789ABCDEF|
+      =============================================================================
+      0x00000000|2e 2f 6d 79 61 70 70 00  53 48 45 4c 4c 3d 2f 62|./myapp.SHELL=/b|
+      0x00000010|69 6e 2f 62 61 73 68 00  4c 41 4e 47 55 41 47 45|in/bash.LANGUAGE|
+      0x00000020|3d 7a 68 5f 43 4e 3a 65  6e 5f 55 53 3a 65 6e 00|=zh_CN:en_US:en.|
+      0x00000030|4c 43 5f 41 44 44 52 45  53 53 3d 7a 68 5f 43 4e|LC_ADDRESS=zh_CN|
+      0x00000040|2e 55 54 46 2d 38 00 4c  43 5f 4e 41 4d 45 3d 7a|.UTF-8.LC_NAME=z|
+      0x00000050|68 5f 43 4e 2e 55 54 46  2d 38 00 ** ** ** ** **|h_CN.UTF-8.*****|
+      =============================================================================
+
+  >> func:parse_args(1, 0x7fffd6433e58) is called. (@file:myreadelf-0.1.02.c,line:0423).
+
+    >>> argv[00](addr=0x7fffd6434660) = {"./myapp"}.
+
+  >> func:parse_args() is called. @line:(0430).
+  >> get_elf64_data("./myapp", len) entry;
+
+0x00563a69597890|00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F|0123456789ABCDEF|
       =============================================================================
       0x00000000|7f 45 4c 46 02 01 01 00  00 00 00 00 00 00 00 00|.ELF............|
-      0x00000010|03 00 3e 00 01 00 00 00  00 12 00 00 00 00 00 00|..>.............|
-      0x00000020|40 00 00 00 00 00 00 00  28 5b 00 00 00 00 00 00|@.......([......|
+      0x00000010|03 00 3e 00 01 00 00 00  80 11 00 00 00 00 00 00|..>.............|
+      0x00000020|40 00 00 00 00 00 00 00  38 6d 00 00 00 00 00 00|@.......8m......|
       0x00000030|00 00 00 00 40 00 38 00  0d 00 40 00 24 00 23 00|....@.8...@.$.#.|
       0x00000040|06 00 00 00 04 00 00 00  40 00 00 00 00 00 00 00|........@.......|
       0x00000050|40 00 00 00 00 00 00 00  40 00 00 00 00 00 00 00|@.......@.......|
@@ -412,27 +528,27 @@ xadmin@hw:~/xwks.git.1/myreadelf-c11$ ./myapp
       0x000000a0|1c 00 00 00 00 00 00 00  01 00 00 00 00 00 00 00|................|
       0x000000b0|01 00 00 00 04 00 00 00  00 00 00 00 00 00 00 00|................|
       0x000000c0|00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00|................|
-      0x000000d0|c0 09 00 00 00 00 00 00  c0 09 00 00 00 00 00 00|................|
+      0x000000d0|38 09 00 00 00 00 00 00  38 09 00 00 00 00 00 00|8.......8.......|
       0x000000e0|00 10 00 00 00 00 00 00  01 00 00 00 05 00 00 00|................|
       0x000000f0|00 10 00 00 00 00 00 00  00 10 00 00 00 00 00 00|................|
-      0x00000100|00 10 00 00 00 00 00 00  e1 0f 00 00 00 00 00 00|................|
-      0x00000110|e1 0f 00 00 00 00 00 00  00 10 00 00 00 00 00 00|................|
-      0x00000120|01 00 00 00 04 00 00 00  00 20 00 00 00 00 00 00|......... ......|
-      0x00000130|00 20 00 00 00 00 00 00  00 20 00 00 00 00 00 00|. ....... ......|
-      0x00000140|d0 08 00 00 00 ** ** **  ** ** ** ** ** ** ** **|.....***********|
+      0x00000100|00 10 00 00 00 00 00 00  81 12 00 00 00 00 00 00|................|
+      0x00000110|81 12 00 00 00 00 00 00  00 10 00 00 00 00 00 00|................|
+      0x00000120|01 00 00 00 04 00 00 00  00 30 00 00 00 00 00 00|.........0......|
+      0x00000130|00 30 00 00 00 00 00 00  00 30 00 00 00 00 00 00|.0.......0......|
+      0x00000140|48 0c 00 00 00 ** ** **  ** ** ** ** ** ** ** **|H....***********|
       =============================================================================
 
-  >> build_elf64_obj(0x557b62b89890, 25640) entry;
-  >> func{parse_elf64_elf_header:(00268)} is call.{pElfData=0x557b62b89890}.
-        struct S_ELF64_ELFHeader_t pElfHeader = {0x557b62b89890} 
+  >> build_elf64_obj(0x563a69597890, 30264) entry;
+  >> func{parse_elf64_elf_header:(00272)} is call.{pElfData=0x563a69597890}.
+        struct S_ELF64_ELFHeader_t pElfHeader = {0x563a69597890} 
         {
                  unsigned char e_ident[16] = {7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00};
                  Elf64_Half    e_type      = 0x0003;
                  Elf64_Half    e_machine   = 0x003e;
                  Elf64_Word    e_version   = 0x1  ;
-                 Elf64_Addr    e_entry     = 0x1200;
+                 Elf64_Addr    e_entry     = 0x1180;
                  Elf64_Off     e_phoff     = 0x40;
-                 Elf64_Off     e_shoff     = 0x5b28;
+                 Elf64_Off     e_shoff     = 0x6d38;
                  Elf64_Word    e_flags     = 0x0  ;
                  Elf64_Half    e_ehsize    = 0x0040;
                  Elf64_Half    e_phentsize = 0x0038;
@@ -442,7 +558,42 @@ xadmin@hw:~/xwks.git.1/myreadelf-c11$ ./myapp
                  Elf64_Half    e_shstrndx  = 0x0023;
         };
   >> build_elf64_obj() exit;
+
+0x00563a6959eee0|00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F|0123456789ABCDEF|
+      =============================================================================
+      0x00000000|90 78 59 69 3a 56 00 00  90 78 59 69 3a 56 00 00|.xYi:V...xYi:V..|
+      0x00000010|00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00|................|
+      0x00000020|00 00 00 00 00 00 00 00  01 91 01 00 00 00 00 00|................|
+      0x00000030|18 00 00 00 00 00 00 00  a1 00 00 00 01 00 00 00|................|
+      0x00000040|06 00 00 00 00 00 00 00  00 10 00 00 00 00 00 00|................|
+      0x00000050|00 10 00 00 00 00 00 00  1b 00 00 00 00 00 00 00|................|
+      0x00000060|00 00 00 00 00 00 00 00  04 00 00 00 00 00 00 00|................|
+      0x00000070|00 00 00 00 00 00 00 00  9c 00 00 00 01 00 00 00|................|
+      0x00000080|06 00 00 00 00 00 00 00  20 10 00 00 00 00 00 00|........ .......|
+      0x00000090|20 10 00 00 00 00 00 00  b0 00 00 00 00 00 00 00| ...............|
+      0x000000a0|00 00 00 00 00 00 00 00  10 00 00 00 00 00 00 00|................|
+      0x000000b0|10 00 00 00 00 00 00 00  a7 00 00 00 01 00 00 00|................|
+      0x000000c0|06 00 00 00 00 00 00 00  d0 10 00 00 00 00 00 00|................|
+      0x000000d0|d0 10 00 00 00 00 00 00  10 00 00 00 00 00 00 00|................|
+      0x000000e0|00 00 00 00 00 00 00 00  10 00 00 00 00 00 00 00|................|
+      0x000000f0|10 00 00 00 00 00 00 00  b0 00 00 00 01 00 00 00|................|
+      0x00000100|06 00 00 00 00 00 00 00  e0 10 00 00 00 00 00 00|................|
+      0x00000110|e0 10 00 00 00 00 00 00  a0 00 00 00 00 00 00 00|................|
+      0x00000120|00 00 00 00 00 00 00 00  10 00 00 00 00 00 00 00|................|
+      0x00000130|10 00 00 00 00 00 00 00  b9 00 00 00 01 00 00 00|................|
+      0x00000140|06 00 00 00 00 ** ** **  ** ** ** ** ** ** ** **|.....***********|
+      =============================================================================
+
   >> the app exit.
+  >> func{my_fini03:(00414)@(myreadelf-0.1.02.c)} is call .
+  #<<<<====
+  >> func{my_fini02:(00402)@(myreadelf-0.1.02.c)} is call .
+  #<<<<====
+  >> func{my_fini01:(00390)@(myreadelf-0.1.02.c)} is call .
+  #<<<<====
+  >> func{after_main_func:(00370)@(myreadelf-0.1.02.c)} is call .
+  #<<<<====
 xadmin@hw:~/xwks.git.1/myreadelf-c11$ 
+
 
 #endif

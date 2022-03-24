@@ -253,6 +253,8 @@ int main(int argc, char* argv[])
             break;
         }
         xlog_hexdump((uint8_t*)p_elf64_data, 16*20+5);
+        
+        free(p_elf64_data);
     }while(0);
     
     xlog_info("  >> the app exit.\n");
