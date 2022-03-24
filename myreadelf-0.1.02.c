@@ -432,6 +432,7 @@ int parse_args(int argc, char* argv[])
 	return 0;
 }
 
+// 增加了main函数前后调用的函数；linux 环境下测试通过；
 // gcc -std=c11 -g -Wall -O0 -DXLOG_PTHREAD_T=1 myreadelf-0.1.00.c -o myapp -pthread
 int main(int argc, char* argv[])
 {

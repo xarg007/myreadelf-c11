@@ -235,6 +235,7 @@ uint8_t* get_elf64_data(const char* filename, uint32_t* len)
     return NULL;
 }
 
+// 准备基础程序
 // gcc -std=c11 -g -Wall -O0 -DXLOG_PTHREAD_T=1 myreadelf-0.1.00.c -o myapp -pthread
 
 int main(int argc, char* argv[])

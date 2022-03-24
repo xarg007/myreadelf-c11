@@ -579,7 +579,8 @@ int parse_args(int argc, char* argv[])
     return 0;
 }
 
-// gcc -std=c11 -g -Wall -O0 -DXLOG_PTHREAD_T=1 myreadelf-0.1.00.c -o myapp -pthread
+// 解析节头表数据
+// gcc -std=c11 -g -Wall -O0 -DXLOG_PTHREAD_T=1 myreadelf-0.1.0x.c -o myapp -pthread
 int main(int argc, char* argv[])
 {
     xlog_init();

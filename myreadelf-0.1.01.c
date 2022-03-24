@@ -354,6 +354,7 @@ $2 = {int (
      } 0x7ffff7ddbfc0 <__libc_start_main>
 #endif
 
+// 从ELF文件中取得十六进制数据，进行ELF Header分析
 // gcc -std=c11 -g -Wall -O0 -DXLOG_PTHREAD_T=1 myreadelf-0.1.00.c -o myapp -pthread
 int main(int argc, char* argv[])
 {
